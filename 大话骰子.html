@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>大话骰 地狱概率AI完整版</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:"微软雅黑";}
+body{background:#1a1a2e;color:#fff;padding:30px;max-width:1100px;margin:0 auto;}
+.wrap{display:flex;flex-direction:column;gap:20px;}
+.box{background:#16213e;padding:20px;border-radius:12px;}
+h2{margin-bottom:15px;color:#00d4ff;}
+h3{margin:10px 0;color:#93d5ff;}
+.dice-group{display:flex;gap:10px;margin:10px 0;}
+.dice{width:50px;height:50px;background:#fff;color:#000;font-size:24px;display:grid;place-items:center;border-radius:8px;font-weight:bold;}
+.ai-dice{filter:blur(8px);}
+.btn{padding:10px 16px;border:none;border-radius:6px;cursor:pointer;margin:8px 12px 8px 0;}
+.btn-blue{background:#00d4ff;color:#000;}
+.btn-red{background:#ff4757;color:#fff;}
+.btn-orange{background:#ff9500;color:#fff;}
+.btn-purple{background:#9933ff;color:#fff;}
+.btn-sm{width:36px;height:36px;padding:0;font-size:18px;}
+.record{margin-top:15px;max-height:220px;overflow-y:auto;padding:10px;background:#0f172a;border-radius:8px;}
+.tip{color:#ffdd59;margin:8px 0;}
+.rule-desc{font-size:13px;color:#ccc;line-height:1.6;margin:10px 0;padding:10px;background:#101c38;border-radius:6px;}
+.call-type-group{margin:8px 0 12px;}
+.score-wrap{display:flex;gap:30px;margin-bottom:15px;align-items:flex-start;}
+.num-control{display:flex;align-items:center;gap:8px;margin:8px 0;}
+.num-show{width:50px;text-align:center;font-size:18px;font-weight:bold;}
+.difficulty-wrap{margin-bottom:10px;}
+.operate-row{display:flex;gap:30px;align-items:flex-start;}
+.left-operate{flex:1;}
+.right-operate{display:flex;flex-direction:column;gap:10px;}
+.prob-tip{color:#cccc00;font-size:12px;margin-top:5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="box">
+        <div class="score-wrap">
+            <div>
+                <h3>计分设置</h3>
+                <label>目标获胜分数(留空则不计分)：
+                    <input type="number" id="targetScore" min="1" placeholder="不填不限局">
+                </label>
+                <div class="difficulty-wrap">
+                    <label>AI难度：
+                        <select id="aiLevel">
+                            <option value="easy">简单（保守少诈牌）</option>
+                            <option value="normal">普通（均衡博弈）</option>
+                            <option value="hard">困难（擅长诈牌博弈）</option>
+                            <option value="hell" selected>地狱（概率计算+癞子分析）</option>
+                        </select>
+                    </label>
+                </div>
+                <div style="margin-top:8px">
+                    <span>你的分数：<strong id="playerScore">0</strong></span>
+                    <span style="margin-left:20px">AI分数：<strong id="aiScore">0</strong></span>
+                </div>
+                <div class="prob-tip" id="probTip"></div>
+            </div>
+        </div>
+        <h2>🤖 AI对手</h2>
+        <div class="dice-group" id="aiDiceBox">
+            <div class="dice ai-dice">?</div>
+            <div class="dice ai-dice">?</div>
+            <div class="dice ai-dice">?</div>
+            <div class="dice ai-dice">?</div>
+            <div class="dice ai-dice">?</div>
+        </div>
+        <p class="tip" id="aiTip">AI已摇好骰子，暂不可查看</p>
+    </div>
+
+    <div class="box">
+        <h2>👤 你的骰子</h2>
+        <div class="dice-group" id="myDiceBox"></div>
+        <p class="tip" id="gameTip">点击【开局摇骰】开始游戏，首局你先手叫骰</p>
+        <div class="rule-desc">
+            <strong>本局规则说明</strong><br>
+            1. 默认飞：1为癞子可代任意点数；喊1点自动为摘模式，1不算癞子<br>
+            2. 花豹子(含1)计6个，纯豹子(无1)计7个<br>
+            3. 同飞/同摘：个数更大 或 同个数点数更大即可<br>
+            4. 切换飞/摘：点数可任意更换，仅个数需要合规：<br>
+               &nbsp;&nbsp;飞转摘：个数最多减2；摘转飞：个数必须翻倍<br>
+            5. 特殊规则：4飞⇋2摘；4飞转2摘后再飞≥5；2摘转4飞后再摘≥3<br>
+            6. 上局输家下一局优先叫骰；点数支持1~6<br>
+            7. 【劈】：等同于开骰，获胜方得2分，普通开骰获胜方得1分<br>
+            8. 地狱AI：自动计算玩家叫牌概率，结合癞子1的分布判断是否诈牌
+        </div>
+    </div>
+
+    <div class="box">
+        <h3>叫骰操作区</h3>
+        <div class="operate-row">
+            <div class="left-operate">
+                <button class="btn btn-blue" id="startBtn">开局摇骰</button>
+                <div class="call-type-group">
+                    <label><input type="radio" name="callType" value="fly" checked> 飞（默认，1是癞子）</label>
+                    <label><input type="radio" name="callType" value="pick"> 摘（1不算癞子）</label>
+                </div>
+
+                <div class="num-control">
+                    <span>个数：</span>
+                    <button class="btn btn-sm" id="numMinus">-</button>
+                    <span class="num-show" id="numShow">2</span>
+                    <button class="btn btn-sm" id="numPlus">+</button>
+                </div>
+                <div class="num-control">
+                    <span>点数：</span>
+                    <button class="btn btn-sm" id="pointMinus">-</button>
+                    <span class="num-show" id="pointShow">3</span>
+                    <button class="btn btn-sm" id="pointPlus">+</button>
+                </div>
+
+                <button class="btn btn-blue" id="callBtn">叫骰</button>
+            </div>
+            <div class="right-operate">
+                <button class="btn btn-red" id="openBtn">开骰</button>
+                <button class="btn btn-orange" id="splitBtn">劈（获胜得2分）</button>
+            </div>
+        </div>
+
+        <div class="record" id="record"></div>
+    </div>
+</div>
+
+<script>
+// 全局游戏配置
+let myDice = [];
+let aiDice = [];
+let lastCall = null;
+let gameStart = false;
+let playerScore = 0;
+let aiScore = 0;
+let targetWinScore = null;
+let firstCaller = 'player';
+let lastLoser = null;
+let playerAggressive = false;
+let playerBluffCount = 0; // 玩家历史诈牌次数，地狱AI用来调整阈值
+
+// DOM元素
+const myDiceBox = document.getElementById('myDiceBox');
+const aiDiceBox = document.getElementById('aiDiceBox');
+const gameTip = document.getElementById('gameTip');
+const aiTip = document.getElementById('aiTip');
+const record = document.getElementById('record');
+const startBtn = document.getElementById('startBtn');
+const callBtn = document.getElementById('callBtn');
+const openBtn = document.getElementById('openBtn');
+const splitBtn = document.getElementById('splitBtn');
+const callTypeRadios = document.querySelectorAll('input[name="callType"]');
+const numShow = document.getElementById('numShow');
+const numMinus = document.getElementById('numMinus');
+const numPlus = document.getElementById('numPlus');
+const pointShow = document.getElementById('pointShow');
+const pointMinus = document.getElementById('pointMinus');
+const pointPlus = document.getElementById('pointPlus');
+const targetScoreInput = document.getElementById('targetScore');
+const playerScoreDom = document.getElementById('playerScore');
+const aiScoreDom = document.getElementById('aiScore');
+const aiLevelSelect = document.getElementById('aiLevel');
+const probTip = document.getElementById('probTip');
+
+let currentNum = 2;
+let currentPoint = 3;
+
+// 组合数计算 C(n,k)
+function comb(n, k) {
+    if (k < 0 || k > n) return 0;
+    if (k === 0 || k === n) return 1;
+    let res = 1;
+    for (let i = 1; i <= k; i++) {
+        res = res * (n - k + i) / i;
+    }
+    return res;
+}
+
+// 二项分布：n次试验，单次概率p，至少k次成功概率
+function binomialAtLeast(n, k, p) {
+    if (k <= 0) return 1;
+    if (k > n) return 0;
+    let total = 0;
+    for (let i = k; i <= n; i++) {
+        let c = comb(n, i);
+        total += c * Math.pow(p, i) * Math.pow(1 - p, n - i);
+    }
+    return total;
+}
+
+function rollDice() {
+    return Math.floor(Math.random() * 6) + 1;
+}
+
+function renderDice(arr, box, isBlur = false) {
+    box.innerHTML = '';
+    arr.forEach(n => {
+        let d = document.createElement('div');
+        d.className = 'dice' + (isBlur ? ' ai-dice' : '');
+        d.innerText = isBlur ? '?' : n;
+        box.appendChild(d);
+    })
+}
+
+function updateScoreView() {
+    playerScoreDom.textContent = playerScore;
+    aiScoreDom.textContent = aiScore;
+}
+
+function getCurrentCallType() {
+    for (let r of callTypeRadios) {
+        if (r.checked) return r.value;
+    }
+    return 'fly';
+}
+
+function countSingleDice(diceArr, target, type) {
+    let cnt = 0;
+    diceArr.forEach(v => {
+        if (type === 'fly') {
+            if (v === target || v === 1) cnt++;
+        } else {
+            if (v === target) cnt++;
+        }
+    })
+    return cnt;
+}
+
+function isLeopard(arr) {
+    return arr.every(v => v === arr[0]);
+}
+
+function getLeopardBonus(arr) {
+    if (!isLeopard(arr)) return 0;
+    return arr.includes(1) ? 6 : 7;
+}
+
+function countTotal(dice1, dice2, target, type) {
+    const all = [...dice1, ...dice2];
+    let baseCnt = 0;
+    if (type === 'fly') {
+        all.forEach(v => {
+            if (v === target || v === 1) baseCnt++;
+        });
+    } else {
+        all.forEach(v => {
+            if (v === target) baseCnt++;
+        });
+    }
+    return baseCnt + getLeopardBonus(dice1) + getLeopardBonus(dice2);
+}
+
+// 最高优先级：特殊后置规则校验
+function specialRuleCheck(newNum, newType) {
+    if (!lastCall) return true;
+    const old = lastCall;
+    if (old.prevFly4 && newType === 'fly') return newNum >= 5;
+    if (old.prevPick2 && newType === 'pick') return newNum >= 3;
+    if (old.type === 'fly' && old.num === 4 && newType === 'pick' && newNum === 2) return true;
+    if (old.type === 'pick' && old.num === 2 && newType === 'fly' && newNum === 4) return true;
+    return true;
+}
+
+function checkCallValid(newNum, newPoint, newType) {
+    if (!lastCall) return true;
+    const old = lastCall;
+    if (newType === old.type) {
+        return newNum > old.num || (newNum === old.num && newPoint > old.point);
+    }
+    if (old.type === 'fly' && newType === 'pick') {
+        return newNum >= old.num - 2 && newNum < old.num;
+    }
+    if (old.type === 'pick' && newType === 'fly') {
+        return newNum >= old.num * 2;
+    }
+    return false;
+}
+
+function addRecord(text) {
+    let p = document.createElement('p');
+    p.innerText = text;
+    record.appendChild(p);
+    record.scrollTop = record.scrollHeight;
+}
+
+function setCallValue(num, point, type) {
+    currentNum = num;
+    currentPoint = point;
+    numShow.textContent = currentNum;
+    pointShow.textContent = currentPoint;
+    document.querySelector(`input[name="callType"][value="${type}"]`).checked = true;
+}
+
+function aiCall() {
+    const level = aiLevelSelect.value;
+    probTip.textContent = '';
+    if (!lastCall) {
+        let initNum, initPoint, initType;
+        if (level === 'hell' || level === 'hard') {
+            initPoint = Math.floor(Math.random() * 5) + 2;
+            initNum = Math.floor(Math.random() * 2) + 2;
+        } else {
+            initNum = 3;
+            initPoint = 3;
+        }
+        initType = 'fly';
+        lastCall = { num: initNum, point: initPoint, type: initType, player: 'AI', prevFly4: false, prevPick2: false };
+        addRecord(`AI叫：${initNum}个${initPoint}点【飞】`);
+        gameTip.textContent = '轮到你叫骰，请叫合法大于上一轮的牌';
+        setCallValue(initNum, initPoint, initType);
+        return;
+    }
+
+    const old = lastCall;
+    const targetX = old.point;
+    const callType = old.type;
+    const aiValid = countSingleDice(aiDice, targetX, callType);
+    const needPlayer = Math.max(0, old.num - aiValid);
+    let pSingle = callType === 'fly' ? 2 / 6 : 1 / 6;
+    const prob = binomialAtLeast(5, needPlayer, pSingle);
+
+    // 地狱难度：概率计算核心
+    let willOpen = false;
+    if (level === 'hell') {
+        // 玩家诈牌越多，开牌阈值越高
+        const baseThreshold = 0.15 + Math.min(playerBluffCount * 0.05, 0.2);
+        probTip.textContent = `【地狱AI概率分析】需要你提供至少${needPlayer}个${targetX}，命中概率：${(prob * 100).toFixed(2)}%，阈值：${(baseThreshold * 100).toFixed(0)}%`;
+        if (prob < baseThreshold) {
+            willOpen = true;
+        }
+        // AI自己是豹子，提高容忍度，不轻易开牌
+        if (isLeopard(aiDice)) willOpen = false;
+    } else {
+        // 原有难度开牌逻辑
+        const avgOther = 2;
+        let openThreshold = level === 'easy' ? 0 : level === 'normal' ? 1 : 2;
+        if (old.num > aiValid + avgOther + openThreshold) willOpen = true;
+        if (playerAggressive && old.num > aiValid + 1) willOpen = true;
+    }
+
+    if (willOpen) {
+        setTimeout(() => {
+            renderDice(aiDice, aiDiceBox, false);
+            const realTotal = countTotal(myDice, aiDice, old.point, old.type);
+            const typeText = old.type === 'fly' ? '飞(1癞子)' : '摘(1不算癞子)';
+            addRecord(`AI选择开骰！全场【${typeText}】${old.point}点实际总数：${realTotal}个`);
+            const callDesc = `${old.num}个${old.point}点${old.type === 'fly' ? '飞' : '摘'}`;
+            let winner, loser;
+            if (realTotal >= old.num) {
+                loser = 'ai';
+                winner = 'player';
+                gameTip.textContent = `开牌失败，${callDesc}属实，AI落败，你获胜！`;
+            } else {
+                loser = old.player;
+                winner = 'ai';
+                gameTip.textContent = `${old.player}谎报${callDesc}，AI获胜！`;
+                playerBluffCount++;
+            }
+            if (targetWinScore) {
+                const score = 1;
+                if (winner === 'player') playerScore += score;
+                else aiScore += score;
+                updateScoreView();
+                if (playerScore >= targetWinScore) gameTip += '\n你全局胜利！';
+                if (aiScore >= targetWinScore) gameTip += '\nAI全局胜利！';
+            }
+            lastLoser = loser;
+            gameStart = false;
+        }, 800);
+        return;
+    }
+
+    let newNum = old.num;
+    let newPoint = old.point;
+    let newType = old.type;
+    const rand = Math.random();
+
+    if (aiValid >= old.num) {
+        newNum = old.num + 1;
+        if ((level === 'hell' || level === 'hard') && rand > 0.7 && old.point < 6) {
+            newPoint = old.point + 1;
+            newNum = old.num;
+        }
+    } else {
+        if (level === 'easy') {
+            newType = 'pick';
+            newNum = old.num === 4 ? 2 : Math.max(1, old.num - 2);
+        } else if (level === 'normal') {
+            newNum = rand > 0.5 ? old.num + 1 : (old.num === 4 ? 2 : Math.max(1, old.num - 2));
+        } else {
+            // 困难/地狱：高概率诈牌
+            newNum = old.num + Math.floor(Math.random() * 2) + 1;
+            if (rand < 0.4) {
+                newType = newType === 'fly' ? 'pick' : 'fly';
+                newNum = newType === 'pick' ? (old.num === 4 ? 2 : Math.max(1, old.num - 2)) : (old.num === 2 ? 4 : old.num * 2);
+            }
+        }
+    }
+
+    if (old.prevFly4 && newType === 'fly' && newNum < 5) newNum = 5;
+    if (old.prevPick2 && newType === 'pick' && newNum < 3) newNum = 3;
+
+    if (!checkCallValid(newNum, newPoint, newType) || !specialRuleCheck(newNum, newType)) {
+        newNum = old.num + 1;
+        newType = old.type;
+        newPoint = old.point;
+    }
+
+    let prevFly4 = (old.type === 'fly' && old.num === 4 && newType === 'pick' && newNum === 2);
+    let prevPick2 = (old.type === 'pick' && old.num === 2 && newType === 'fly' && newNum === 4);
+    lastCall = { num: newNum, point: newPoint, type: newType, player: 'AI', prevFly4, prevPick2 };
+    addRecord(`AI叫：${newNum}个${newPoint}点【${newType === 'fly' ? '飞' : '摘'}】`);
+    gameTip.textContent = `轮到你，请叫大于：${newNum}个${newPoint}点${newType === 'fly' ? '飞' : '摘'}`;
+    setCallValue(newNum, newPoint, newType);
+}
+
+numMinus.onclick = () => {
+    if (currentNum > 1) {
+        currentNum--;
+        numShow.textContent = currentNum;
+    }
+}
+numPlus.onclick = () => {
+    currentNum++;
+    numShow.textContent = currentNum;
+}
+pointMinus.onclick = () => {
+    if (currentPoint > 1) {
+        currentPoint--;
+        pointShow.textContent = currentPoint;
+    }
+}
+pointPlus.onclick = () => {
+    if (currentPoint < 6) {
+        currentPoint++;
+        pointShow.textContent = currentPoint;
+    }
+}
+
+startBtn.onclick = function () {
+    const val = targetScoreInput.value.trim();
+    targetWinScore = val ? parseInt(val) : null;
+    myDice = [rollDice(), rollDice(), rollDice(), rollDice(), rollDice()];
+    aiDice = [rollDice(), rollDice(), rollDice(), rollDice(), rollDice()];
+    lastCall = null;
+    record.innerHTML = '';
+    gameStart = true;
+    playerAggressive = false;
+    renderDice(myDice, myDiceBox);
+    renderDice(aiDice, aiDiceBox, true);
+    if (lastLoser === 'ai') {
+        firstCaller = 'ai';
+        gameTip.textContent = '上局AI落败，本局AI先手叫骰';
+        setTimeout(aiCall, 600);
+    } else {
+        firstCaller = 'player';
+        gameTip.textContent = '本局你先手叫骰，点数范围1~6';
+    }
+    aiTip.textContent = 'AI已摇好骰子，暂不可查看';
+    setCallValue(2, 3, 'fly');
+    probTip.textContent = '';
+}
+
+callBtn.onclick = function () {
+    if (!gameStart) {
+        alert('请先开局摇骰！');
+        return;
+    }
+    const num = currentNum;
+    const point = currentPoint;
+    let type = getCurrentCallType();
+    if (num < 1 || point < 1 || point > 6) {
+        alert('数量≥1，点数1~6！');
+        return;
+    }
+    if (point === 1) {
+        type = 'pick';
+        document.querySelector('input[name="callType"][value="pick"]').checked = true;
+    }
+    if (lastCall && num > lastCall.num + 2) playerAggressive = true;
+
+    const specialValid = specialRuleCheck(num, type);
+    const normalValid = checkCallValid(num, point, type);
+    if (!specialValid) {
+        if (lastCall.prevFly4) {
+            alert('违规！4飞转2摘后，再次切换飞模式个数必须≥5个！');
+        } else if (lastCall.prevPick2) {
+            alert('违规！2摘转4飞后，再次切换摘模式个数必须≥3个！');
+        } else {
+            alert('叫牌不符合特殊规则！');
+        }
+        return;
+    }
+    if (!normalValid) {
+        alert('叫牌不符合飞/摘个数转换规则，请重新叫牌！');
+        return;
+    }
+
+    let prevFly4 = (lastCall?.type === 'fly' && lastCall.num === 4 && type === 'pick' && num === 2);
+    let prevPick2 = (lastCall?.type === 'pick' && lastCall.num === 2 && type === 'fly' && num === 4);
+    lastCall = { num, point, type, player: 'player', prevFly4, prevPick2 };
+    addRecord(`你叫：${num}个${point}点【${type === 'fly' ? '飞' : '摘'}】`);
+    setTimeout(aiCall, 1000);
+}
+
+function settleGame(isSplit = false) {
+    if (!gameStart || !lastCall) {
+        alert('必须先有人叫牌！');
+        return;
+    }
+    renderDice(aiDice, aiDiceBox, false);
+    const { num, point, type, player } = lastCall;
+    const realTotal = countTotal(myDice, aiDice, point, type);
+    const typeText = type === 'fly' ? '飞(1癞子)' : '摘(1不算癞子)';
+    addRecord(`${isSplit ? '【劈牌】' : ''}全场【${typeText}】${point}点实际总数：${realTotal}个（含豹子加成）`);
+    const callDesc = `${num}个${point}点${type === 'fly' ? '飞' : '摘'}`;
+
+    let winner, loser;
+    if (realTotal >= num) {
+        loser = 'player';
+        winner = 'ai';
+        gameTip.textContent = `${isSplit ? '劈牌失败！' : '开牌失败，'}${callDesc}属实，你本局落败！`;
+        playerBluffCount++;
+    } else {
+        loser = player;
+        winner = 'player';
+        gameTip.textContent = `${player === 'player' ? '你' : 'AI'}谎报${callDesc}，你本局获胜！`;
+    }
+
+    if (targetWinScore) {
+        const addScore = isSplit ? 2 : 1;
+        if (winner === 'player') {
+            playerScore += addScore;
+        } else {
+            aiScore += addScore;
+        }
+        updateScoreView();
+        if (playerScore >= targetWinScore) {
+            gameTip += `\n恭喜你达成${targetWinScore}分，全局胜利！`;
+        }
+        if (aiScore >= targetWinScore) {
+            gameTip += `\nAI达成${targetWinScore}分，本局全局落败！`;
+        }
+    }
+
+    lastLoser = loser;
+    gameStart = false;
+}
+
+openBtn.onclick = () => settleGame(false);
+splitBtn.onclick = () => settleGame(true);
+
+updateScoreView();
+</script>
+</body>
+</html>

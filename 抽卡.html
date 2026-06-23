@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>砺火成锋抽卡模拟器｜六星概率递增修复最终版</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", system-ui, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #1a1a2e;
+            color: #fff;
+            max-width: 1100px;
+            margin: 15px auto;
+            padding: 0 12px;
+            min-height: 100vh;
+        }
+        h2 {
+            font-size: 1.3rem;
+            margin: 12px 0 16px;
+            text-align: center;
+        }
+        .wrap {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        @media (min-width: 768px) {
+            .wrap {
+                grid-template-columns: 340px 1fr;
+            }
+        }
+        .panel {
+            background: #27293d;
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+        h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #444;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+        p {
+            margin: 8px 0;
+            font-size: 0.95rem;
+        }
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .btn {
+            flex: 1;
+            min-width: 110px;
+            padding: 10px 6px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-ten {background:#ff7b00;color:#fff}
+        .btn-one {background:#2277ff;color:#fff}
+        .btn-reset {background:#555;color:#fff}
+        .btn-recharge {background:#00bb77;color:#fff}
+        .result {
+            background:#111;
+            padding:15px;
+            min-height: 220px;
+            border-radius:8px;
+            white-space:pre-wrap;
+            font-size: 0.9rem;
+        }
+        .star6 {color:#ffd700}
+        .star5 {color:#ff69b4}
+        .star4 {color:#66ccff}
+        .star3 {color:#aaaaaa}
+        .red {color:#ff5555}
+        .green {color:#4cd964}
+        table {
+            width:100%;
+            border-collapse: collapse;
+            margin:10px 0;
+            font-size: 0.9rem;
+        }
+        td,th {
+            border:1px solid #444;
+            padding:7px 4px;
+            text-align:center;
+        }
+        .warehouse-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #333;
+        }
+        .warehouse-title6 {color:#ffd700;font-weight:bold}
+        .warehouse-title5 {color:#ff69b4;font-weight:bold;margin-top:10px}
+    </style>
+</head>
+<body>
+<h2>砺火成锋·狩猎凯旋复刻 抽卡模拟器</h2>
+<div class="wrap">
+    <div class="left">
+        <div class="panel">
+            <h3>💰 充值 & 合成玉</h3>
+            <p>当前合成玉：<span id="jade" class="green">0</span></p>
+            <div class="btn-group">
+                <button class="btn btn-recharge" onclick="recharge(6,600)">6元=600玉</button>
+                <button class="btn btn-recharge" onclick="recharge(30,3000)">30元=3000玉</button>
+                <button class="btn btn-recharge" onclick="recharge(98,9800)">98元=9800玉</button>
+                <button class="btn btn-recharge" onclick="recharge(198,19800)">198元=19800玉</button>
+                <button class="btn btn-recharge" onclick="recharge(328,32800)">328元=32800玉</button>
+                <button class="btn btn-recharge" onclick="recharge(648,64800)">648元=64800玉</button>
+            </div>
+            <p>累计充值金额：<span id="costMoney" class="red">0</span> 元</p>
+        </div>
+
+        <div class="panel">
+            <h3>🎫 抽卡操作</h3>
+            <p>单次消耗：600合成玉｜十连消耗：6000合成玉</p>
+            <div class="btn-group">
+                <button class="btn btn-one" onclick="pullOne()">单抽(600玉)</button>
+                <button class="btn btn-ten" onclick="pullTen()">十连(6000玉)</button>
+                <button class="btn btn-reset" onclick="resetAll()">全部重置</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>📊 抽卡实时状态</h3>
+            <p>总抽卡次数：<span id="totalPull">0</span></p>
+            <p>距上次六星：<span id="noSix">0</span> 抽</p>
+            <p>麒麟R夜刀120抽保底：<span id="limitProgress">0</span>/120</p>
+            <p>是否已出限定：<span id="getLimit">否</span></p>
+            <p>当前六星概率：<span id="sixRate">2.00%</span></p>
+            <p>前十抽五星保底：<span id="firstTenFive">未触发</span></p>
+        </div>
+
+        <div class="panel">
+            <h3>📦 干员仓库（累计持有）</h3>
+            <div class="warehouse-title6">★6星干员</div>
+            <div id="warehouse6"></div>
+            <div class="warehouse-title5">★5星干员</div>
+            <div id="warehouse5"></div>
+        </div>
+
+        <div class="panel">
+            <h3>📈 全局概率统计</h3>
+            <table>
+                <tr>
+                    <th>星级</th><th>抽到次数</th><th>占比</th>
+                </tr>
+                <tr>
+                    <td>★6</td><td id="cnt6">0</td><td id="rate6">0.00%</td>
+                </tr>
+                <tr>
+                    <td>★5</td><td id="cnt5">0</td><td id="rate5">0.00%</td>
+                </tr>
+                <tr>
+                    <td>★4</td><td id="cnt4">0</td><td id="rate4">0.00%</td>
+                </tr>
+                <tr>
+                    <td>★3</td><td id="cnt3">0</td><td id="rate3">0.00%</td>
+                </tr>
+            </table>
+            <p>六星歪卡数量：<span id="other6Cnt">0</span> 张</p>
+        </div>
+    </div>
+
+    <div class="right">
+        <div class="panel">
+            <h3>📜 本次抽卡结果（仅展示当前抽取）</h3>
+            <div class="result" id="log"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let jade = 0;
+let totalMoney = 0;
+let totalPull = 0;
+let noSixPull = 0; // 连续未出六星次数（控制概率递增）
+let limitPull = 0; // 当期限定120抽井计数（同卡池可重复累计）
+let hasLimit = false;
+
+// 前十抽必5星保底
+let firstTenHighStar = false;
+let pullInFirstTen = 0;
+
+let cnt6 = 0, cnt5 = 0, cnt4 = 0, cnt3 = 0;
+let other6Cnt = 0;
+const baseSix = 2.0;
+
+let warehouse = {};
+
+const star6Pool = [
+    "麒麟R夜刀(限定UP)", "艾雅法拉", "银灰", "能天使", "星熊", "塞雷娅",
+    "赫拉格", "陈", "闪灵", "夜莺", "推进之王", "温蒂", "泥岩", "史尔特尔"
+];
+const star5Pool = ["火龙S黑角(限定UP)","白面鸮","德克萨斯","幽灵鲨","蓝毒","拉普兰德","红","陨星"];
+const star4Pool = ["桃金娘","苏苏洛","砾","红豆","杰西卡","角峰","古米","末药"];
+const star3Pool = ["芬","克洛丝","玫兰莎","梓兰","炎熔","米格鲁"];
+
+function recharge(money, addJade) {
+    totalMoney += money;
+    jade += addJade;
+    updateMoneyUI();
+}
+
+// 六星概率计算公式：连续n抽没出六星，50抽后每次+2%，上限100%
+function getSixRate(){
+    if(noSixPull <= 50) return baseSix;
+    return Math.min(baseSix + (noSixPull - 50) * 2, 100);
+}
+
+function getNormalPullResult(){
+    const sixRate = getSixRate();
+    let res;
+    const rand = Math.random() * 100;
+
+    if(rand < sixRate){
+        // 抽到六星，重置连续未出计数
+        noSixPull = 0;
+        cnt6++;
+        if(Math.random() < 0.5){
+            res = {name:"麒麟R夜刀(UP六星)", star:6};
+            hasLimit = true;
+            limitPull = 0; // 抽到限定，重置井计数，可继续下一轮120抽
+        }else{
+            const other6 = star6Pool.filter(x=>!x.includes("麒麟"));
+            let name = other6[Math.floor(Math.random()*other6.length)];
+            res = {name, star:6};
+            other6Cnt++;
+        }
+    }else if(rand < sixRate + 8){
+        cnt5++;
+        if(Math.random() < 0.5){
+            res = {name:"火龙S黑角(UP五星)", star:5};
+        }else{
+            const other5 = star5Pool.filter(x=>!x.includes("火龙"));
+            res = {name: other5[Math.floor(Math.random()*other5.length)], star:5};
+        }
+    }else if(rand < sixRate + 8 + 50){
+        cnt4++;
+        res = {name: star4Pool[Math.floor(Math.random()*star4Pool.length)], star:4};
+    }else{
+        cnt3++;
+        res = {name: star3Pool[Math.floor(Math.random()*star3Pool.length)], star:3};
+    }
+    return res;
+}
+
+function getHighStarPullResult(){
+    const sixRate = getSixRate();
+    let res;
+    const rand = Math.random() * 100;
+    if(rand < sixRate){
+        noSixPull = 0;
+        cnt6++;
+        if(Math.random() < 0.5){
+            res = {name:"麒麟R夜刀(UP六星)", star:6};
+            hasLimit = true;
+            limitPull = 0;
+        }else{
+            const other6 = star6Pool.filter(x=>!x.includes("麒麟"));
+            let name = other6[Math.floor(Math.random()*other6.length)];
+            res = {name, star:6};
+            other6Cnt++;
+        }
+    }else{
+        cnt5++;
+        if(Math.random() < 0.5){
+            res = {name:"火龙S黑角(UP五星)", star:5};
+        }else{
+            const other5 = star5Pool.filter(x=>!x.includes("火龙"));
+            res = {name: other5[Math.floor(Math.random()*other5.length)], star:5};
+        }
+    }
+    firstTenHighStar = true;
+    return res;
+}
+
+function singlePull(){
+    if(jade < 600){
+        return {err:"玉不足"};
+    }
+    jade -= 600;
+    totalPull++;
+    // 只要抽卡，限定井计数就持续累加（同卡池支持重复井潜能）
+    limitPull++;
+    // 没抽到六星才累加连续未出计数，用来涨概率
+    noSixPull++;
+
+    // 前十抽高星保底计数
+    if(!firstTenHighStar && pullInFirstTen < 10){
+        pullInFirstTen++;
+    }
+
+    // 120抽强制大保底，必定出麒麟R夜刀
+    if(limitPull >= 120){
+        hasLimit = true;
+        limitPull = 0;
+        noSixPull = 0; // 井出六星，必须重置概率递增计数器
+        cnt6++;
+        const res = {name:"麒麟R夜刀(限定120抽大保底)", star:6};
+        warehouse[res.name] = (warehouse[res.name] || 0) + 1;
+        updateAllUI();
+        return res;
+    }
+
+    let res = getNormalPullResult();
+
+    // 前十抽必五星以上保底
+    if(!firstTenHighStar && pullInFirstTen === 10 && res.star <=4){
+        res = getHighStarPullResult();
+    }
+    if(!firstTenHighStar && pullInFirstTen <=10 && res.star >=5){
+        firstTenHighStar = true;
+    }
+
+    warehouse[res.name] = (warehouse[res.name] || 0) + 1;
+
+    updateAllUI();
+    return res;
+}
+
+function pullOne(){
+    let card = singlePull();
+    if(card.err){
+        document.getElementById("log").innerHTML = `<span class='red'>合成玉不足，请先充值！</span>`;
+        return;
+    }
+    document.getElementById("log").innerHTML = formatCard(card);
+}
+
+function pullTen(){
+    if(jade < 6000){
+        document.getElementById("log").innerHTML = `<span class='red'>合成玉不足，无法十连！</span>`;
+        return;
+    }
+    let str = "===== 本次十连结果 =====\n";
+    for(let i=0;i<10;i++){
+        let card = singlePull();
+        str += formatCard(card) + "\n";
+    }
+    document.getElementById("log").innerHTML = str;
+}
+
+function formatCard(card){
+    switch(card.star){
+        case 6: return `<span class="star6">★6 ${card.name}</span>`;
+        case 5: return `<span class="star5">★5 ${card.name}</span>`;
+        case 4: return `<span class="star4">★4 ${card.name}</span>`;
+        default: return `<span class="star3">★3 ${card.name}</span>`;
+    }
+}
+
+function updateMoneyUI(){
+    document.getElementById("jade").innerText = jade;
+    document.getElementById("costMoney").innerText = totalMoney;
+}
+
+function renderWarehouse(){
+    let html6 = "";
+    let html5 = "";
+    for(let name in warehouse){
+        let num = warehouse[name];
+        if(name.includes("麒麟") || star6Pool.some(item=>name.includes(item.replace("(UP六星)","")))){
+            html6 += `<div class="warehouse-item"><span>${name}</span><span>×${num}</span></div>`;
+        }else if(name.includes("火龙") || star5Pool.some(item=>name.includes(item.replace("(UP五星)","")))){
+            html5 += `<div class="warehouse-item"><span>${name}</span><span>×${num}</span></div>`;
+        }
+    }
+    document.getElementById("warehouse6").innerHTML = html6 || "<div>暂无六星</div>";
+    document.getElementById("warehouse5").innerHTML = html5 || "<div>暂无五星</div>";
+}
+
+function updateAllUI(){
+    updateMoneyUI();
+    document.getElementById("totalPull").innerText = totalPull;
+    document.getElementById("noSix").innerText = noSixPull;
+    document.getElementById("limitProgress").innerText = limitPull;
+    document.getElementById("getLimit").innerText = hasLimit ? "是" : "否";
+    document.getElementById("sixRate").innerText = getSixRate().toFixed(2)+"%";
+    document.getElementById("firstTenFive").innerText = firstTenHighStar ? "已触发" : "未触发";
+
+    document.getElementById("cnt6").innerText = cnt6;
+    document.getElementById("cnt5").innerText = cnt5;
+    document.getElementById("cnt4").innerText = cnt4;
+    document.getElementById("cnt3").innerText = cnt3;
+
+    let total = totalPull || 1;
+    document.getElementById("rate6").innerText = (cnt6/total*100).toFixed(2)+"%";
+    document.getElementById("rate5").innerText = (cnt5/total*100).toFixed(2)+"%";
+    document.getElementById("rate4").innerText = (cnt4/total*100).toFixed(2)+"%";
+    document.getElementById("rate3").innerText = (cnt3/total*100).toFixed(2)+"%";
+
+    document.getElementById("other6Cnt").innerText = other6Cnt;
+    renderWarehouse();
+}
+
+function resetAll(){
+    jade = 0;
+    totalMoney = 0;
+    totalPull = 0;
+    noSixPull = 0;
+    limitPull = 0;
+    hasLimit = false;
+    firstTenHighStar = false;
+    pullInFirstTen = 0;
+    cnt6 = cnt5 = cnt4 = cnt3 = 0;
+    other6Cnt = 0;
+    warehouse = {};
+    document.getElementById("log").innerHTML = "";
+    updateAllUI();
+}
+
+updateAllUI();
+</script>
+</body>
+</html>
