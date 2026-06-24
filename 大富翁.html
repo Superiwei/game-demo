@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>企业级 - 单页环形大富翁模拟器</title>
+<style>
+*{box-sizing:border-box;font-family:"Microsoft YaHei",sans-serif;margin:0;padding:0;}
+body{
+    background-color: #2c2440;
+    padding: 24px;
+    color: #f0f0f0;
+}
+.main-container{
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #3b3052;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15);
+    padding: 24px;
+}
+.page-title{
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #ffffff;
+    border-left: 4px solid #b894f0;
+    padding-left: 12px;
+}
+#ringBoard{
+  width: 960px;
+  height: 960px;
+  margin: 30px auto 0;
+  position: relative;
+  border: none;
+  border-radius: 8px;
+  background: #483c63;
+}
+#centerPanel{
+  width: 640px;
+  height: 640px;
+  position: absolute;
+  left: 80px;
+  top: 80px;
+  background: #f8f6ff;
+  border: 1px solid #c9b8ee;
+  border-radius: 8px;
+  padding: 20px;
+  overflow: hidden;
+  z-index: 5;
+}
+.grid{
+  width: 80px;
+  height: 80px;
+  border: 1px solid #d1c7e9;
+  position: absolute;
+  padding: 5px;
+  font-size: 11px;
+  overflow: hidden;
+  border-radius: 4px;
+  color: #2d1b50;
+  z-index: 2;
+}
+.grid.current-player{
+  border: 3px solid #ff3333;
+  background-color: #fff2f2 !important;
+  box-shadow: 0 0 8px #ff6666;
+}
+/* 大号圆形玩家棋子 */
+.player-token{
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  border:2px solid #fff;
+  display:inline-block;
+  margin:1px;
+  box-shadow:0 0 3px #333;
+}
+/* 三角+方形房屋样式 */
+.house-wrap{
+  display:flex;
+  gap:2px;
+  margin-top:2px;
+}
+.house-tri{
+  width: 0;
+  height: 0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-bottom:8px solid currentColor;
+}
+.house-square{
+  width:12px;
+  height:8px;
+  background:currentColor;
+}
+.player-item{margin:10px 0;display:flex;align-items:center;gap:12px;}
+.info-top{margin-bottom:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.log{
+  height:160px;
+  overflow-y:auto;
+  border:1px solid #d1c7e9;
+  padding:10px;
+  background:#f3f0fc;
+  border-radius:6px;
+  font-size:13px;
+  color:#222;
+}
+input,select{
+  padding:6px 10px;
+  font-size:14px;
+  border-radius:6px;
+  border:1px solid #b8a6e0;
+  background:#f8f6ff;
+  color:#222;
+}
+button{
+  padding:6px 14px;
+  font-size:14px;
+  border-radius:6px;
+  border:none;
+  background:#805ad5;
+  color:#fff;
+  cursor:pointer;
+  transition: background 0.2s;
+}
+button:hover{
+    background:#6b46c1;
+}
+button:disabled{
+  background:#9482b8;
+  cursor:not-allowed;
+}
+.player-card{
+  border:1px solid #d1c7e9;
+  padding:8px 12px;
+  margin:6px 0;
+  border-radius:6px;
+  background:#f3f0fc;
+  color:#222;
+}
+.house-tag{
+  display:inline-block;
+  background:#78350f;
+  color:#fff;
+  font-size:10px;
+  padding:2px 4px;
+  border-radius:3px;
+  margin:2px;
+}
+h4{
+    font-size:15px;
+    margin:8px 0;
+    color:#2d1b50;
+}
+.game-wrap{
+    text-align:center;
+}
+.dice-box{
+  display: flex;
+  gap:10px;
+  align-items: center;
+  margin: 10px 0;
+}
+.dice{
+  width:40px;
+  height:40px;
+  background:#fff;
+  border-radius:6px;
+  display: grid;
+  place-items:center;
+  font-weight:bold;
+  font-size:18px;
+  box-shadow:inset 0 0 4px #999;
+}
+.dice-red{
+  background:#ff4444;
+  color:#fff;
+}
+.dice-blue{
+  background:#4466ff;
+  color:#fff;
+}
+/* 网页全局弹窗遮罩 */
+.modal-mask{
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,0.5);
+  z-index:998;
+  display:none;
+}
+.modal-box{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  background:#fff;
+  padding:30px;
+  border-radius:10px;
+  min-width:420px;
+  z-index:999;
+  color:#222;
+}
+.modal-box h3{
+  margin-bottom:16px;
+}
+.modal-box p{
+  line-height:1.8;
+  font-size:16px;
+}
+.modal-btn{
+  margin-top:20px;
+  text-align:right;
+}
+.sell-list{
+  margin:12px 0;
+  max-height:220px;
+  overflow-y:auto;
+}
+</style>
+</head>
+<body>
+<div class="main-container">
+    <div class="page-title">🎲 大富翁游戏 - 单页环形大富翁模拟器</div>
+
+    <div class="setting-wrap">
+        <h3 style="margin-bottom:15px;color:#fff">开局参数配置</h3>
+        <div class="info-top">
+            玩家人数：
+            <select id="playerCount">
+                <option value="2">2人</option>
+                <option value="3">3人</option>
+                <option value="4">4人</option>
+                <option value="5">5人</option>
+                <option value="6">6人</option>
+            </select>
+            <button onclick="renderPlayerSetting()">生成玩家配置</button>
+        </div>
+        <div class="info-top">
+            自定义起始现金：<input type="number" id="startMoney" value="1500" min="500" max="10000">
+        </div>
+        <div id="playerSettingBox"></div>
+        <button onclick="startGame()" style="margin-top:12px;padding:8px 18px;">开始本局游戏</button>
+    </div>
+
+    <div class="game-wrap">
+        <div id="ringBoard">
+            <div id="centerPanel">
+                <div class="info-top">
+                    当前回合：<span id="turnInfo" style="font-weight:600;font-size:16px;color:#6b46c1;">未开局</span>
+                    <button id="rollBtn" onclick="rollDice()" disabled>掷骰子</button>
+                    <div class="dice-box">
+                        <span>骰子点数：</span>
+                        <div class="dice dice-red" id="dice1">0</div>
+                        <div class="dice dice-blue" id="dice2">0</div>
+                        <span id="diceTotal">总计：0</span>
+                    </div>
+                </div>
+                <div>
+                    <h4>👤 玩家资产信息</h4>
+                    <div id="playerList" style="max-height:160px;overflow-y:auto;margin-bottom:12px;"></div>
+                </div>
+                <div>
+                    <h4>📜 游戏日志（最多保留8条，滚轮拖动查看）</h4>
+                    <div class="log" id="logBox"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 全局弹窗容器 -->
+<div class="modal-mask" id="modalMask">
+    <div class="modal-box" id="modalBox">
+        <h3 id="modalTitle"></h3>
+        <div id="modalContent"></div>
+        <div class="modal-btn">
+            <button id="modalConfirmBtn">确定</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const oneGrid = 80;
+const offsetDownTwo = oneGrid * 2;
+const gridPositions = [];
+
+// 上边 0~9
+for(let i = 0; i < 10; i++) {
+    gridPositions.push({ left: i * oneGrid, top: 0 });
+}
+// 右边 10~19
+for(let i = 0; i < 10; i++) {
+    gridPositions.push({ left: 720, top: (i + 1) * oneGrid });
+}
+// 底部20~29 向下移动2格
+for(let i = 9; i >= 0; i--) {
+    gridPositions.push({ left: i * oneGrid, top: 720 + offsetDownTwo });
+}
+// 左侧30~39 原始位置不变
+for(let i = 9; i >= 0; i--) {
+    gridPositions.push({ left: 0, top: (i + 1) * oneGrid });
+}
+
+const groupColors = [
+    '#ffebee','#e3f2fd','#e8f5e9','#fff8e1'
+];
+const gridCount = 40;
+const gridData = [];
+for(let i=0;i<gridCount;i++){
+    let group = Math.floor(i/10);
+    if(i===0){
+        gridData.push({type:'start',name:'🏁起点',price:0,owner:null,houseLv:0,bg:'#e6f4ea'});
+    }else if([10,20,30].includes(i)){
+        gridData.push({type:'jail',name:'⛓️监狱',price:0,owner:null,houseLv:0,bg:'#fee'});
+    }else if([5,15,25,35].includes(i)){
+        gridData.push({type:'chance',name:'❓机会',price:0,owner:null,houseLv:0,bg:'#fffde7'});
+    }else{
+        gridData.push({
+            type:'land',
+            name:`地块${i}`,
+            price:100+i*2,
+            owner:null,
+            houseLv:0,
+            houseCost:Math.floor((100+i*2)/2),
+            baseRent:Math.floor((100+i*2)/2),
+            bg:groupColors[group],
+            group:group
+        });
+    }
+}
+
+let players = [];
+let currentPlayerIndex = 0;
+let gameStarted = false;
+let logList = [];
+let modalResolve = null;
+
+// 内置弹窗封装
+function showModal(title,content){
+    return new Promise(resolve=>{
+        document.getElementById('modalTitle').innerText = title;
+        document.getElementById('modalContent').innerHTML = content;
+        document.getElementById('modalMask').style.display = 'block';
+        modalResolve = resolve;
+        document.getElementById('modalConfirmBtn').onclick = ()=>{
+            document.getElementById('modalMask').style.display = 'none';
+            resolve();
+        }
+    })
+}
+
+// 修复下拉框显示错误：绑定value
+function renderPlayerSetting(){
+    const count = +document.getElementById('playerCount').value;
+    const box = document.getElementById('playerSettingBox');
+    box.innerHTML = '';
+    for(let i=0;i<count;i++){
+        const div = document.createElement('div');
+        div.className = 'player-item';
+        div.innerHTML = `
+            第${i+1}位：
+            <select class="ctrlSel">
+                <option value="user">玩家控制</option>
+                <option value="ai">电脑控制</option>
+            </select>
+            <span class="nameTip">玩家控制</span>
+        `;
+        box.appendChild(div);
+    }
+}
+
+function startGame(){
+    const sels = document.querySelectorAll('.ctrlSel');
+    if(sels.length<2) return alert('请先选择人数并生成玩家配置');
+    const startMoney = parseInt(document.getElementById('startMoney').value) || 1500;
+    players = [];
+    logList = [];
+    gridData.forEach(item=>{
+        item.owner = null;
+        item.houseLv = 0;
+    })
+    sels.forEach((sel,idx)=>{
+        const isAI = sel.value === 'ai';
+        players.push({
+            id:idx,
+            isAI:isAI,
+            name:isAI?`电脑${idx+1}`:`玩家${idx+1}`,
+            pos:0,
+            money:startMoney,
+            lands:[],
+            bankrupt:false,
+            color:`hsl(${idx*60},75%,45%)`
+        })
+    })
+    gameStarted = true;
+    renderRingBoard();
+    refreshPlayerList();
+    refreshLog();
+    highlightPlayerPos();
+    nextTurn();
+}
+
+function renderRingBoard(){
+    const board = document.getElementById('ringBoard');
+    const centerDom = document.getElementById('centerPanel');
+    board.innerHTML = '';
+    board.appendChild(centerDom);
+
+    gridData.forEach((g,idx)=>{
+        const pos = gridPositions[idx];
+        const div = document.createElement('div');
+        div.className = 'grid';
+        div.dataset.index = idx;
+        div.style.left = pos.left + 'px';
+        div.style.top = pos.top + 'px';
+        div.style.backgroundColor = g.bg;
+
+        // 渲染彩色圆形棋子
+        let tokenHtml = '';
+        players.filter(p=>p.pos===idx&&!p.bankrupt).forEach(p=>{
+            tokenHtml += `<span class="player-token" style="background:${p.color}" title="${p.name}"></span>`;
+        });
+
+        // 渲染三角+方块房子
+        let houseHtml = '';
+        if(g.owner != null && g.houseLv > 0){
+            const owner = players.find(p=>p.id === g.owner);
+            let houseItem = `<div class="house-tri" style="color:${owner.color}"></div><div class="house-square" style="background:${owner.color}"></div>`;
+            houseHtml = `<div class="house-wrap">${houseItem.repeat(g.houseLv)}</div>`;
+        }
+
+        let ownerName = g.type === 'land' ? (g.owner ? players.find(p=>p.id===g.owner).name : '无主') : '';
+        let priceText = g.type === 'land' ? `地价:${g.price}` : '';
+
+        div.innerHTML = `${tokenHtml}<br>${g.name}${houseHtml}${ownerName?`<br>主人:${ownerName}<br>${priceText}`:''}`;
+        board.appendChild(div);
+    })
+    highlightPlayerPos();
+}
+
+function highlightPlayerPos(){
+    document.querySelectorAll('.grid').forEach(el=>el.classList.remove('current-player'));
+    const currPos = players[currentPlayerIndex].pos;
+    const targetGrid = document.querySelector(`.grid[data-index="${currPos}"]`);
+    if(targetGrid) targetGrid.classList.add('current-player');
+}
+
+function refreshPlayerList(){
+    const list = document.getElementById('playerList');
+    list.innerHTML = '';
+    players.forEach(p=>{
+        const div = document.createElement('div');
+        div.className = 'player-card';
+        let landStr = '';
+        p.lands.forEach(lid=>{
+            const land = gridData[lid];
+            landStr += `<span class="house-tag">${land.name}(Lv${land.houseLv})</span>`;
+        })
+        div.innerHTML = `
+            <span style="color:${p.color};font-weight:bold">${p.name}</span>
+            现金:${p.money} ${p.bankrupt?'【已破产】':''}<br>
+            持有地块(${p.lands.length})：${landStr||'无'}
+        `;
+        list.appendChild(div);
+    })
+}
+
+function addLog(txt){
+    logList.push(txt);
+    if(logList.length > 8) logList.shift();
+    refreshLog();
+}
+
+function refreshLog(){
+    const logBox = document.getElementById('logBox');
+    logBox.innerHTML = logList.join('<br>');
+    logBox.scrollTop = logBox.scrollHeight;
+}
+
+function getCurrentPlayer(){
+    return players[currentPlayerIndex];
+}
+
+// 修复无限摇骰子：严格控制按钮禁用状态
+async function nextTurn(){
+    let cnt = 0;
+    do{
+        currentPlayerIndex = (currentPlayerIndex+1)%players.length;
+        cnt++;
+    }while(getCurrentPlayer().bankrupt && cnt<players.length);
+
+    const p = getCurrentPlayer();
+    document.getElementById('turnInfo').innerText = p.name;
+    const rollBtn = document.getElementById('rollBtn');
+    rollBtn.disabled = p.isAI;
+
+    if(p.isAI && !p.bankrupt){
+        setTimeout(()=>rollDice(),1200);
+    }
+}
+
+async function rollDice(){
+    const p = getCurrentPlayer();
+    if(p.bankrupt) return;
+    // 玩家掷骰子后立刻禁用按钮，防止重复点击
+    document.getElementById('rollBtn').disabled = true;
+
+    const d1 = Math.floor(Math.random()*6)+1;
+    const d2 = Math.floor(Math.random()*6)+1;
+    const total = d1+d2;
+    document.getElementById('dice1').innerText = d1;
+    document.getElementById('dice2').innerText = d2;
+    document.getElementById('diceTotal').innerText = `总计：${total}`;
+    addLog(`${p.name}掷出${d1}+${d2}，前进${total}步`);
+
+    const oldPos = p.pos;
+    p.pos = (p.pos + total) % gridCount;
+    highlightPlayerPos();
+
+    // 优化起点提示文案：清晰区分两种奖励
+    if(p.pos === 0){
+        p.money += 300;
+        await showModal('到达起点奖励',`✅ 你本次骰子刚好停在起点格子，一次性领取奖励【300金币】\n当前持有现金：${p.money} 金币`);
+        addLog(`${p.name}精准落脚起点，领取300金币奖励`);
+    }else if(oldPos + total >= gridCount){
+        p.money += 200;
+        await showModal('途经起点路费',`✅ 你本轮行走绕棋盘一圈经过起点，领取基础路费【200金币】\n当前持有现金：${p.money} 金币`);
+        addLog(`${p.name}途经起点，领取200金币路费`);
+    }
+
+    await landEvent(p,p.pos);
+    refreshPlayerList();
+    renderRingBoard();
+
+    if(checkGameOver()) return;
+    nextTurn();
+}
+
+async function landEvent(player,pos){
+    const g = gridData[pos];
+    if(g.type==='start') return;
+    if(g.type==='jail'){
+        await showModal('入狱提示',`${player.name}踩到监狱格子，本回合不能进行任何操作`);
+        addLog(`${player.name}进入监狱停留一回合`);
+        return;
+    }
+    if(g.type==='chance'){
+        const r = Math.random();
+        if(r>0.5){
+            player.money += 120;
+            await showModal('幸运机会卡',`恭喜抽到好运，直接获得120金币！\n当前现金：${player.money}`);
+            addLog(`${player.name}抽到好运机会，获得120金币`);
+        }else{
+            player.money -= 120;
+            addLog(`${player.name}抽到倒霉机会，扣除120金币`);
+            await checkBankruptProcess(player);
+        }
+        return;
+    }
+
+    // 踩到他人土地 缴纳租金
+    if(g.owner !== null){
+        const owner = players.find(p=>p.id === g.owner);
+        const rent = Math.floor(g.baseRent * Math.pow(2, g.houseLv));
+        await showModal('【地块缴费详情】',`
+地块名称：${g.name}<br>
+地块所属主人：${owner.name}<br>
+当前房屋等级：${g.houseLv} 级<br>
+本次需要支付租金：${rent} 金币
+        `);
+        player.money -= rent;
+        owner.money += rent;
+        addLog(`${player.name}踩入${g.name}，向${owner.name}缴纳租金${rent}金币`);
+        await checkBankruptProcess(player);
+        return;
+    }
+
+    // 无主地块：玩家弹窗购买，AI智能判断
+    if(!player.isAI){
+        const buyConfirm = confirm(`【地块购买】\n地块名称：${g.name}\n购买地价：${g.price} 金币\n是否花费${g.price}金币拿下该地块？`);
+        if(buyConfirm){
+            if(player.money >= g.price){
+                player.money -= g.price;
+                g.owner = player.id;
+                player.lands.push(pos);
+                addLog(`${player.name}花费${g.price}金币成功购买${g.name}`);
+                // 购买后判断是否可以建房，弹出升级确认
+                await checkCanBuildHouse(player,g);
+            }else{
+                await showModal('购买失败',`当前现金${player.money}金币，不足以支付${g.price}金币地价`);
+            }
+        }
+    }else{
+        // AI策略：现金充足+同组优先才买地
+        if(player.money < g.price * 2){
+            addLog(`${player.name}资金保守，放弃收购${g.name}`);
+            return;
+        }
+        const sameGroupLands = gridData.filter(item=>item.type==='land' && item.group === g.group);
+        const ownSame = sameGroupLands.filter(item=>item.owner === player.id);
+        if(ownSame.length > 0 || sameGroupLands.every(item=>item.owner===null)){
+            player.money -= g.price;
+            g.owner = player.id;
+            player.lands.push(pos);
+            addLog(`${player.name}战略布局，花费${g.price}金币收购${g.name}`);
+            // AI垄断后手动弹窗确认建房
+            await checkCanBuildHouse(player,g);
+        }else{
+            addLog(`${player.name}放弃非核心区域地块${g.name}`);
+        }
+    }
+}
+
+// 新增：垄断后弹出房屋升级确认弹窗
+async function checkCanBuildHouse(player,land){
+    if(land.houseLv >= 3) return;
+    const sameGroup = gridData.filter(x=>x.type==='land' && x.group === land.group);
+    const ownAll = sameGroup.every(x=>x.owner === player.id);
+    if(!ownAll) return;
+
+    const cost = land.houseCost;
+    const tip = `【房屋升级】\n你已经垄断该色系全部地块，可以建造房屋\n升级费用：${cost} 金币\n当前现金：${player.money} 金币\n是否升级该地块房屋？`;
+    if(player.isAI){
+        if(player.money >= cost * 2){
+            const confirm = confirm(tip);
+            if(confirm){
+                land.houseLv++;
+                player.money -= cost;
+                addLog(`${player.name}将${land.name}升级至${land.houseLv}级房屋`);
+                renderRingBoard();
+                refreshPlayerList();
+            }
+        }
+    }else{
+        const confirm = confirm(tip);
+        if(confirm && player.money >= cost){
+            land.houseLv++;
+            player.money -= cost;
+            addLog(`${player.name}成功将${land.name}房屋升级至${land.houseLv}级`);
+            renderRingBoard();
+            refreshPlayerList();
+        }else if(confirm){
+            await showModal('升级失败',`现金不足${cost}金币，无法建造房屋`);
+        }
+    }
+}
+
+// 破产变卖房产流程
+async function checkBankruptProcess(p){
+    while(p.money < 0 && p.lands.length > 0){
+        let sellHtml = '<p>⚠️ 当前资金为负数，必须变卖名下地块偿还债务，变卖价格为购入地价的50%</p><div class="sell-list">';
+        p.lands.forEach((lid,idx)=>{
+            const land = gridData[lid];
+            const sellPrice = Math.floor(land.price * 0.5);
+            sellHtml += `<p><button onclick="sellLand(${p.id},${idx})">变卖 ${land.name} → 获得${sellPrice}金币</button></p>`;
+        })
+        sellHtml += '</div>';
+        await showModal('资金濒临破产',sellHtml);
+    }
+    if(p.money < 0){
+        p.bankrupt = true;
+        p.lands.forEach(lid=>{
+            gridData[lid].owner = null;
+            gridData[lid].houseLv = 0;
+        })
+        p.lands = [];
+        await showModal('破产淘汰出局',`${p.name}名下所有地块变卖后依旧资不抵债，正式破产淘汰，所有土地回收！`);
+        addLog(`⚠️ ${p.name}彻底破产，淘汰出局，全部地块回收`);
+    }
+}
+
+// 全局变卖地块函数
+window.sellLand = function(playerId,landIdx){
+    const p = players.find(x=>x.id === playerId);
+    const landPos = p.lands[landIdx];
+    const land = gridData[landPos];
+    const sellMoney = Math.floor(land.price * 0.5);
+    p.money += sellMoney;
+    land.owner = null;
+    land.houseLv = 0;
+    p.lands.splice(landIdx,1);
+    addLog(`${p.name}变卖${land.name}，获得${sellMoney}金币还债，当前现金：${p.money}`);
+    document.getElementById('modalMask').style.display = 'none';
+    refreshPlayerList();
+    renderRingBoard();
+}
+
+function checkGameOver(){
+    const alive = players.filter(p=>!p.bankrupt);
+    if(alive.length === 1){
+        alert(`🏆 游戏结束！最终冠军：${alive[0].name}`);
+        return true;
+    }
+    return false;
+}
+</script>
+</body>
+</html>
